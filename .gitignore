@@ -1,5 +1,6 @@
 img_dir
 output_dir
+gif_dir
 
 .scratch/
 .DS_STORE

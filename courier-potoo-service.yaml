@@ -1,0 +1,72 @@
+apiVersion: runcourier.dev/v1alpha1
+kind: Service
+metadata:
+  name: courier-potoo
+  namespace: courier-potoo
+  description: Courier workflow for processing demo files!
+  docstring: null
+  labels: {}
+  annotations: {}
+spec:
+  broker:
+    transport: memory
+    max_retries: 5
+  run:
+    - identifier: data-monitor-file-system-poller-watchdog
+      spec:
+        kind: data_monitor
+        name: file_system_poller_watchdog
+        config:
+          path: output_dir
+          hostname: localhost
+    - identifier: job-builder-dummyjobbuilder
+      spec:
+        kind: job_builder
+        name: DummyJobBuilder
+        config:
+          payload:
+            identifier: payload-python-payload
+            spec:
+              kind: payload
+              name: python_payload
+              config:
+                file: potoo.py
+                suffix_args:
+                  - -i
+                  - "{{ files[0].file }}"
+                  - -I
+                  - img_dir
+                  - -o
+                  - gif_dir
+    - identifier: dispatcher-local-dispatcher
+      spec:
+        kind: dispatcher
+        name: local_dispatcher
+        config:
+          timeout_seconds: 3600.0
+          log_to_logger: false
+          log_to_file: false
+          log_only_errors: false
+          scan_stderr: false
+          max_workers: 1
+  allow_implicit_target: true
+  service_config:
+    service_id: watcher-service-78ddf4ce
+    namespace: default
+    prometheus_port: 8000
+    broker_url: amqp://admin:admin@localhost:5672/
+    broker_max_retries: 5
+    broker_prefetch_count: 1
+    broker_max_redeliveries: 3
+    heartbeat_interval: 30
+    plugin_restart_delay: 5
+    plugin_max_restart_attempts: 3
+    plugin_health_check_interval: 2
+    loki_url: ''
+    loki_enabled: false
+    log_level: DEBUG
+    production_mode: false
+    tracing_enabled: false
+    tracing_endpoint: http://localhost:4318/v1/traces
+    tracing_service_name: ''
+    tracing_sample_rate: 1.0

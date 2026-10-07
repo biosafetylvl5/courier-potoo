@@ -24,7 +24,7 @@ def init_argparse() -> argparse.Namespace:
 
     # time between generation of random images
     parser.add_argument("--timeout", "-t", type=int, default=0.5)
-    # where the random images are stored
+    # where the generated images/gifs are stored
     parser.add_argument("--outputpath", "-o", type=str, default=".")
     # filetype
     parser.add_argument("--filetype", type=str, default="png")
