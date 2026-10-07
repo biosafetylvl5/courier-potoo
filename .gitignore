@@ -1,2 +1,5 @@
 img_dir
 output_dir
+
+.scratch/
+.DS_STORE
