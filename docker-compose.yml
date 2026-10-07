@@ -1,0 +1,15 @@
+services:
+  redis:
+    image: redis
+  courier:
+    build:
+      context: .
+      dockerfile: courier.Dockerfile
+    volumes:
+      - ".:/work/"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /opt/venv/bin/python -m pip install -r requirements.txt &&
+        courier run courier-potoo-service.yaml
