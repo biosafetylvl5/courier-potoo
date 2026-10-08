@@ -2,6 +2,7 @@ import os
 import time
 import random
 import string
+import tempfile
 from pathlib import Path
 from loguru import logger
 from PIL import Image
@@ -18,12 +19,12 @@ def init_argparse() -> argparse.Namespace:
         description="helper demo for courier",
     )
     # does this program write random files? if not, it's an ingester
-    parser.add_argument("--write", "-w", type=bool, default=False)
+    parser.add_argument("--write", "-w", action="store_true")
     # collection of images to be converted to
     parser.add_argument("--imagepath", "-I", type=str, default="")
 
     # time between generation of random images
-    parser.add_argument("--timeout", "-t", type=int, default=0.5)
+    parser.add_argument("--timeout", "-t", type=float, default=0.5)
     # where the generated images/gifs are stored
     parser.add_argument("--outputpath", "-o", type=str, default=".")
     # filetype
@@ -46,7 +47,7 @@ class Potoo:
         self._image_path : Path = Path(args.imagepath)
         self._output_path : Path = Path(args.outputpath)
         self._filetype : str = args.filetype
-        self._timeout : int = args.timeout
+        self._timeout : float = args.timeout
         self._iterations = args.iterations
         self._duration = args.duration
     def _generate_tag(self, length=8):
@@ -66,11 +67,26 @@ class Potoo:
         ]
 
         return Image.fromarray( random_image )
+    def _atomic_save(self, image : Image.Image, dest : Path, **kwargs) -> Path:
+        # Courier's file watcher fires as soon as a file appears, so write to a
+        # temp file outside dest's directory and rename it in once complete.
+        fd, tmp_path = tempfile.mkstemp(dir=dest.resolve().parent.parent,
+                                        prefix=".potoo-", suffix=dest.suffix)
+        os.close(fd)
+        # mkstemp creates 0600 files; use the usual umask-based mode instead
+        umask = os.umask(0)
+        os.umask(umask)
+        os.chmod(tmp_path, 0o666 & ~umask)
+        try:
+            image.save(tmp_path, **kwargs)
+            os.replace(tmp_path, dest)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        return dest
     def _save_image(self, image : Image.Image) -> Path:
         tag = self._generate_tag()
-        path_name = f"{os.path.join(self._output_path, tag)}.{self._filetype}"
-        image.save(path_name)
-        return Path(path_name)
+        return self._atomic_save(image, self._output_path / f"{tag}.{self._filetype}")
         
     def drive_writer(self) -> None:
         while(True):
@@ -79,13 +95,9 @@ class Potoo:
             logger.debug(f"Saved random image to {saved_image}")
             time.sleep(self._timeout)
     def _generate_gif(self, steps_arr : list[Image.Image], tag : str) -> Path:
-        output_path = f"{os.path.join(self._output_path, tag)}.gif"
-        # write to a temp file then rename, so readers never see a partial GIF
-        tmp_path = f"{output_path}.tmp"
-        steps_arr[0].save(tmp_path, format="GIF", save_all=True,
-                          append_images=steps_arr, duration=self._duration)
-        os.replace(tmp_path, output_path)
-        return Path(output_path)
+        return self._atomic_save(steps_arr[0], self._output_path / f"{tag}.gif",
+                                 format="GIF", save_all=True,
+                                 append_images=steps_arr, duration=self._duration)
     def ingest_image(self, source : Path) -> None:
         # get random image from imagepath
         source_img = Image.open(source)

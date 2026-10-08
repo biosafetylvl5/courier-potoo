@@ -3,7 +3,11 @@ potoo/gif_dir/*
 !potoo/output_dir/.gitkeep
 !potoo/gif_dir/.gitkeep
 __pycache__/
+.venv/
 
 dist/
 .scratch/
 .DS_Store
+
+# potoo.py temp files (left behind only if it crashes mid-write)
+potoo/.potoo-*
