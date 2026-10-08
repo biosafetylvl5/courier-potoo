@@ -23,8 +23,9 @@ Here's a fun diagram to demonstrate the workflow:
 ## Steps to Run 
 1. Clone this repo and `cd` into it
 2. Run `mkdir potoo/output_dir potoo/gif_dir`
-3. Pull and run all docker services with `docker compose up -d`
-4. View the web page on `localhost:8080`
-5. Start writing files with this command:
+3. Create and activate a python virtual environment using `python3 -m venv .venv` or `uv venv`, then `source .venv/bin/activate`. Install all requirements with `pip3 install -r requirements.txt` or `uv pip install -r requirements.txt`
+4. Pull and run all docker services with `docker compose up -d`
+5. View the web page on `localhost:8080`
+6. Start writing files with this command:
    `python3 potoo.py -w True -o output_dir/`
-6. Click on individual images to see their generated GIFs. Tiles with green backgrounds are ready to view!
+7. Click on individual images to see their generated GIFs. Tiles with green backgrounds are ready to view!
