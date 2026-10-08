@@ -1,0 +1,73 @@
+# Exercise 4 solution: two independent pipelines in one service
+# See "Learn Courier" in README.md. Run from the repository root:
+#   courier run services/courier/exercises/04-two-pipelines.yaml
+apiVersion: runcourier.dev/v1alpha1
+kind: Service
+metadata:
+  name: courier-potoo
+  namespace: courier-potoo
+  description: Two pipelines in one service
+spec:
+  broker:
+    transport: memory
+  run:
+    # Two data monitors. Each stamps its files with a different hostname.
+    - identifier: watch-inputs
+      spec:
+        kind: data_monitor
+        name: file_system_poller_watchdog
+        config:
+          path: potoo/output_dir
+          hostname: inputs
+    - identifier: watch-gifs
+      spec:
+        kind: data_monitor
+        name: file_system_poller_watchdog
+        config:
+          path: potoo/gif_dir
+          hostname: gifs
+    # Every job builder receives every file from every data monitor, so each
+    # builder filters on hostname to take only its own monitor's files.
+    # Without the filters, build-gifs would also turn finished GIFs into GIFs.
+    - identifier: build-gifs
+      spec:
+        kind: job_builder
+        name: filter_and_group
+        config:
+          files_per_job: 1
+          filters:
+            hostname: inputs
+          payload:
+            identifier: payload-python-payload
+            spec:
+              kind: payload
+              name: python_payload
+              config:
+                file: potoo/potoo.py
+                suffix_args: ["-i", "{{ files[0].file }}", "-I", "potoo/img_dir", "-o", "potoo/gif_dir"]
+    - identifier: log-finished-gifs
+      spec:
+        kind: job_builder
+        name: filter_and_group
+        config:
+          files_per_job: 1
+          filters:
+            hostname: gifs
+          payload:
+            identifier: payload-audit
+            spec:
+              kind: payload
+              name: bash_payload
+              config:
+                script: |
+                  echo "$(date +%T) finished {{ files[0].file }}" >> audit.log
+    - identifier: dispatcher-local-dispatcher
+      spec:
+        kind: dispatcher
+        name: local_dispatcher
+        config:
+          max_workers: 1
+  allow_implicit_target: true
+  service_config:
+    log_level: INFO
+    tracing_enabled: false

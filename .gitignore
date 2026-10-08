@@ -11,3 +11,7 @@ dist/
 
 # potoo.py temp files (left behind only if it crashes mid-write)
 potoo/.potoo-*
+audit.log
+potoo-server_*/
+potoo-server_*.tar.gz
+my-pipeline.yaml

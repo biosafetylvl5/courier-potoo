@@ -3,15 +3,32 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Re-publish an existing tag, e.g. if a release was created by hand first.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and publish (e.g. v0.1.1)
+        required: true
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: Check tag
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9A-Za-z.+-]+$ ]]; then
+            echo "Not a release tag: $TAG"; exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -23,14 +40,19 @@ jobs:
         run: go test -race ./...
 
       - name: Build release archives
-        run: scripts/build-release.sh "$GITHUB_REF_NAME"
+        run: scripts/build-release.sh "$TAG"
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            dist/*.tar.gz dist/*.zip dist/SHA256SUMS \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            --verify-tag
+          assets=(dist/*.tar.gz dist/*.zip dist/SHA256SUMS)
+          # Upload to the release if it already exists (e.g. created in the UI).
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --title "$TAG" \
+              --generate-notes \
+              --verify-tag
+          fi

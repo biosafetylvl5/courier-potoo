@@ -21,14 +21,205 @@ Here's a fun diagram to demonstrate the workflow (note: it predates the removal 
 
 ---
 
-## Steps to Run 
-1. Clone this repo and `cd` into it
-2. Create and activate a python virtual environment using `python3 -m venv .venv` or `uv venv`, then `source .venv/bin/activate`. Install all requirements with `pip3 install -r requirements.txt` or `uv pip install -r requirements.txt`
-3. Pull and run all docker services with `docker compose up -d`
-4. View the web page on `localhost:8080`
-5. Start writing files from the `potoo/` directory with this command:
-   `python3 potoo.py -w True -o output_dir/`
-6. Click on individual images to see their generated GIFs. Tiles with green backgrounds are ready to view!
+## Learn Courier with potoo
+
+This tutorial runs everything directly on your machine: no Docker, no broker, no database. It was tested on macOS
+(Apple silicon) with Python 3.12. Plan on about 20 minutes.
+
+### What you will build
+
+Courier connects three kinds of pipeline steps through queues:
+
+1. A **data monitor** watches for new data. Here, `file_system_poller_watchdog` watches `potoo/output_dir/` and emits one
+   message per new file.
+2. A **job builder** turns those messages into jobs. Here, `DummyJobBuilder` makes one job per file by filling the file's
+   path into a **payload**, a command template written in Jinja (`{{ files[0].file }}`).
+3. A **dispatcher** runs the jobs. Here, `local_dispatcher` runs each job as a local process.
+
+```
+potoo.py -w ──writes PNG──▶ potoo/output_dir/
+                                 │
+                       data monitor (watchdog)
+                                 │  queue: courier-potoo-FilesFound-job-builder-dummyjobbuilder
+                       job builder (DummyJobBuilder + python_payload)
+                                 │  queue: courier-potoo-JobReady-dispatcher-local-dispatcher
+                       dispatcher (local_dispatcher)
+                                 │  runs: python potoo/potoo.py -i <file> -I potoo/img_dir -o potoo/gif_dir
+                                 ▼
+                          potoo/gif_dir/<name>.gif ──▶ web app shows the tile green
+```
+
+The whole pipeline is one file: `services/courier/courier-potoo-local.yaml`. Read it now. It's short and commented.
+
+### 1. Install
+
+From the repository root:
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+courier --version          # prints: courier 1.0.0a29
+```
+
+You'll need three terminals. In each one, `cd` to the repository root and run `source .venv/bin/activate`. Every
+command below assumes that. Courier resolves paths in the YAML, and the `python` it runs for each job, from that
+directory and that virtualenv.
+
+### 2. Check the configuration
+
+```sh
+courier validate services/courier/courier-potoo-local.yaml
+```
+
+Expected output:
+
+```
+services/courier/courier-potoo-local.yaml is valid.
+  3 pipeline steps: 1 data monitor, 1 job builder, 1 dispatcher
+  job-builder-dummyjobbuilder runs payload payload-python-payload (python_payload)
+  broker: memory
+```
+
+To see the queues Courier will create between the steps:
+
+```sh
+courier queues list services/courier/courier-potoo-local.yaml
+```
+
+The list includes the two queues from the diagram. Each queue also has a `-DeadLetter` twin that holds messages that
+failed repeatedly.
+
+### 3. Start Courier (terminal 1)
+
+```sh
+courier run services/courier/courier-potoo-local.yaml
+```
+
+Startup takes about a second and ends with `Service courier-potoo started successfully`. You'll also see:
+
+- a `WARNING ... auto-wired to sole dispatcher`. This is expected. The YAML sets `allow_implicit_target: true` instead of
+  naming the dispatcher. Exercise 4 shows how to name it.
+- `Starting Prometheus server on port 8000`. Courier serves metrics there, so port 8000 must be free.
+
+Leave it running. Stop it with Ctrl-C, which takes about 2 seconds.
+
+### 4. Start the web app (terminal 2)
+
+Download `potoo-server` for your platform from the
+[Releases page](https://github.com/biosafetylvl5/courier-potoo/releases). For example, on an Apple silicon Mac:
+
+```sh
+V=v0.1.0 P=darwin_arm64    # see the Releases page for other versions/platforms
+curl -fLO "https://github.com/biosafetylvl5/courier-potoo/releases/download/$V/potoo-server_${V}_${P}.tar.gz"
+tar -xzf "potoo-server_${V}_${P}.tar.gz"
+./potoo-server_${V}_${P}/potoo-server -output-dir potoo/output_dir -gif-dir potoo/gif_dir
+```
+
+With Go installed, you can instead build from source:
+`cd server && go run . -output-dir ../potoo/output_dir -gif-dir ../potoo/gif_dir` (not tested in this tutorial). Open <http://localhost:8080>. The page is empty until images arrive.
+
+### 5. Trace one file (terminal 3)
+
+Write exactly one random image:
+
+```sh
+python potoo/potoo.py -w -n 1 -o potoo/output_dir
+```
+
+It prints the file it saved, e.g. `potoo/output_dir/HiG2CTaZ.png`. Within a second, terminal 1 logs the three hops:
+
+```
+INFO  [Plugin: file_system_poller_watchdog] Found file: {... "file": ".../potoo/output_dir/HiG2CTaZ.png", "hostname": "localhost", ...}
+INFO  [Plugin: DummyJobBuilder] Job .../HiG2CTaZ.png is ready; emitting
+INFO  [Plugin: DummyJobBuilder] Emitted job .../HiG2CTaZ.png to targets ['dispatcher-local-dispatcher']
+```
+
+About 4 seconds later, `potoo/gif_dir/HiG2CTaZ.gif` appears and the tile on the web page turns green. Click it to
+watch the GIF.
+
+The dispatcher logs nothing at `INFO` when a job succeeds. The GIF is your evidence. A failed job is logged as
+`ERROR [Plugin: local_dispatcher] Error processing job ...` with a traceback, as you'll see in exercise 2.
+
+### 6. Run continuously
+
+```sh
+python potoo/potoo.py -w -o potoo/output_dir
+```
+
+This writes an image every 0.5 s until you press Ctrl-C. The dispatcher runs one job at a time (`max_workers: 1`),
+and each GIF takes a few seconds, so a backlog builds up in the `JobReady` queue. Watch the tiles turn green one by one.
+Slow the writer with `-t 5`, or raise `max_workers` in the YAML and restart Courier.
+
+`potoo.py` writes each image to a temporary file and renames it into `output_dir/`. Courier then never picks up a
+half-written image. Do the same when you feed your own files to a watched directory.
+
+### Exercises
+
+Copy the base config, edit the copy, then `courier validate` it and `courier run` it in terminal 1 after stopping the
+previous run. Solutions live in `services/courier/exercises/`.
+
+```sh
+cp services/courier/courier-potoo-local.yaml my-pipeline.yaml
+```
+
+**1. Change the payload.** `potoo.py` accepts `-it N` (number of frames, default 25). Add `-it` and `"5"` to the end of
+`suffix_args`. (Quote the number: YAML would otherwise read it as an integer.) Restart Courier and write one image. The new GIF has 5
+frames and finishes faster. Solution: `exercises/01-fewer-frames.yaml`.
+
+**2. Break it on purpose.** Find out which mistakes `courier validate` catches:
+- Change `name: DummyJobBuilder` to `name: DummyJobBuildr`. Validation fails and lists the job builders that do exist:
+  `No job_builders plugin named 'DummyJobBuildr'. Available: DummyJobBuilder, file_count_builder, filter_and_group, metadata_router.`
+- Change `{{ files[0].file }}` to `{{ file[0].file }}`. Validation **passes**, because templates are rendered only when a
+  job is built. Run it and write one image. Terminal 1 logs `ERROR ... Error processing job` ending in
+  `UndefinedError: 'file' is undefined`, and no GIF appears. The variables available to a payload template are
+  `files`, `job`, `config` and `builder`.
+
+**3. Add a second job builder.** Add this step before the dispatcher:
+
+```yaml
+    - identifier: job-builder-audit
+      spec:
+        kind: job_builder
+        name: DummyJobBuilder
+        config:
+          payload:
+            identifier: payload-audit
+            spec:
+              kind: payload
+              name: bash_payload
+              config:
+                script: |
+                  echo "$(date +%T) saw {{ files[0].file }}" >> audit.log
+```
+
+`courier queues list` now shows a second `FilesFound-job-builder-audit` queue. Write two images (`-n 2`). You get two GIFs
+**and** two lines in `audit.log`. The data monitor publishes to a fanout exchange, so every job builder receives a copy
+of every file. The two auto-wire warnings show that both builders are sent to the only dispatcher. Solution:
+`exercises/03-second-builder.yaml`.
+
+**4. Two independent pipelines in one service.** Fanout means a builder has to opt out of files it shouldn't handle. Give
+each data monitor its own `hostname` (`hostname: inputs` on `potoo/output_dir`, `hostname: gifs` on a second monitor
+watching `potoo/gif_dir`). Then use the `filter_and_group` job builder with `files_per_job: 1` and
+`filters: {hostname: ...}` so that one builder makes GIFs from inputs and another logs each finished GIF to `audit.log`.
+Without the filters, the GIF builder would also try to turn every finished GIF into a GIF. Adding
+`targets: [dispatcher-local-dispatcher]` to each builder's config removes the auto-wire warning. Solution:
+`exercises/04-two-pipelines.yaml`.
+
+### Limits of the in-memory broker
+
+The `memory` transport keeps the queues inside the one `courier run` process. Two consequences:
+
+- Every step must run in that process. To spread data monitors, builders and dispatchers across processes or machines,
+  switch `broker.transport` to a real broker such as RabbitMQ.
+- Messages that are still queued when Courier stops are lost. Files that arrive while Courier is down are not picked up
+  later. The watchdog monitor reports only files created while it is running.
+
+### Running with Docker instead
+
+`docker compose up -d` runs Courier (`services/courier/courier-potoo-service.yaml`, with container paths) and the web
+app in containers. CI builds these images. The tutorial above was not tested against them. Run the writer on the
+host: `python potoo/potoo.py -w -o potoo/output_dir`.
 
 ---
 
@@ -59,5 +250,7 @@ until you run `xattr -d com.apple.quarantine potoo-server`.
 ### Making a Release
 
 Push a tag starting with `v` (e.g. `git tag v0.1.0 && git push origin v0.1.0`). The `Release` workflow tests the
-server, builds all six targets with `scripts/build-release.sh` and publishes the archives. Run the same script locally
+server, builds all six targets with `scripts/build-release.sh` and publishes the archives. If the release already exists,
+for example because it was created in the GitHub UI, the workflow uploads the archives to it instead. To (re)build an
+existing tag, run the workflow manually from the Actions tab and enter the tag. Run the same script locally
 to reproduce a release in `dist/`.

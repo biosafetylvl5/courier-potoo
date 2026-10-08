@@ -1,0 +1,71 @@
+# Exercise 3 solution: a second job builder sees every file
+# See "Learn Courier" in README.md. Run from the repository root:
+#   courier run services/courier/exercises/03-second-builder.yaml
+apiVersion: runcourier.dev/v1alpha1
+kind: Service
+metadata:
+  name: courier-potoo
+  namespace: courier-potoo
+  description: Turn each new image in potoo/output_dir into a GIF
+spec:
+  # How the steps below pass messages to each other. "memory" keeps every
+  # queue inside this one Courier process: no RabbitMQ or other broker needed.
+  broker:
+    transport: memory
+  run:
+    # 1. Data monitor: emits one message per new file in potoo/output_dir.
+    - identifier: data-monitor-file-system-poller-watchdog
+      spec:
+        kind: data_monitor
+        name: file_system_poller_watchdog
+        config:
+          path: potoo/output_dir
+    # 2. Job builder: turns each file into a job that runs the payload below.
+    #    {{ files[0].file }} is filled in with the path of the job's file.
+    - identifier: job-builder-dummyjobbuilder
+      spec:
+        kind: job_builder
+        name: DummyJobBuilder
+        config:
+          payload:
+            identifier: payload-python-payload
+            spec:
+              kind: payload
+              name: python_payload
+              config:
+                file: potoo/potoo.py
+                suffix_args:
+                  - -i
+                  - "{{ files[0].file }}"
+                  - -I
+                  - potoo/img_dir
+                  - -o
+                  - potoo/gif_dir
+    # A second job builder: logs every file it is sent.
+    - identifier: job-builder-audit
+      spec:
+        kind: job_builder
+        name: DummyJobBuilder
+        config:
+          payload:
+            identifier: payload-audit
+            spec:
+              kind: payload
+              name: bash_payload
+              config:
+                script: |
+                  echo "$(date +%T) saw {{ files[0].file }}" >> audit.log
+    # 3. Dispatcher: runs each job as a local process, one at a time.
+    - identifier: dispatcher-local-dispatcher
+      spec:
+        kind: dispatcher
+        name: local_dispatcher
+        config:
+          max_workers: 1
+  # Lets the one job builder send jobs to the one dispatcher without naming it.
+  allow_implicit_target: true
+  # Keep the log readable (DEBUG prints every message in full) and skip
+  # exporting traces, which needs an OpenTelemetry collector.
+  service_config:
+    log_level: INFO
+    tracing_enabled: false

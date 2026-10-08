@@ -25,6 +25,8 @@ def init_argparse() -> argparse.Namespace:
 
     # time between generation of random images
     parser.add_argument("--timeout", "-t", type=float, default=0.5)
+    # how many images to write before exiting (0 = forever)
+    parser.add_argument("--count", "-n", type=int, default=0)
     # where the generated images/gifs are stored
     parser.add_argument("--outputpath", "-o", type=str, default=".")
     # filetype
@@ -48,6 +50,7 @@ class Potoo:
         self._output_path : Path = Path(args.outputpath)
         self._filetype : str = args.filetype
         self._timeout : float = args.timeout
+        self._count : int = args.count
         self._iterations = args.iterations
         self._duration = args.duration
     def _generate_tag(self, length=8):
@@ -89,11 +92,14 @@ class Potoo:
         return self._atomic_save(image, self._output_path / f"{tag}.{self._filetype}")
         
     def drive_writer(self) -> None:
-        while(True):
+        written = 0
+        while self._count == 0 or written < self._count:
             generated_image = self._generate_random_image()
             saved_image = self._save_image(generated_image)
             logger.debug(f"Saved random image to {saved_image}")
-            time.sleep(self._timeout)
+            written += 1
+            if self._count == 0 or written < self._count:
+                time.sleep(self._timeout)
     def _generate_gif(self, steps_arr : list[Image.Image], tag : str) -> Path:
         return self._atomic_save(steps_arr[0], self._output_path / f"{tag}.gif",
                                  format="GIF", save_all=True,
