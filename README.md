@@ -22,8 +22,9 @@ Here's a fun diagram to demonstrate the workflow:
 
 ## Steps to Run 
 1. Clone this repo and `cd` into it
-2. Pull and run all docker services with `docker compose up -d`
-3. View the web page on `localhost:8080`
-4. Start writing files with this command:
+2. Run `mkdir potoo/output_dir potoo/gif_dir`
+3. Pull and run all docker services with `docker compose up -d`
+4. View the web page on `localhost:8080`
+5. Start writing files with this command:
    `python3 potoo.py -w True -o output_dir/`
-5. Click on individual images to see their generated GIFs. Tiles with green backgrounds are ready to view!
+6. Click on individual images to see their generated GIFs. Tiles with green backgrounds are ready to view!
