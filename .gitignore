@@ -1,5 +1,9 @@
-output_dir/*
-gif_dir/*
+potoo/output_dir/*
+potoo/gif_dir/*
+!potoo/output_dir/.gitkeep
+!potoo/gif_dir/.gitkeep
+__pycache__/
 
+dist/
 .scratch/
-.DS_STORE
+.DS_Store

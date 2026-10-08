@@ -23,10 +23,41 @@ Here's a fun diagram to demonstrate the workflow (note: it predates the removal 
 
 ## Steps to Run 
 1. Clone this repo and `cd` into it
-2. Run `mkdir potoo/output_dir potoo/gif_dir`
-3. Create and activate a python virtual environment using `python3 -m venv .venv` or `uv venv`, then `source .venv/bin/activate`. Install all requirements with `pip3 install -r requirements.txt` or `uv pip install -r requirements.txt`
-4. Pull and run all docker services with `docker compose up -d`
-5. View the web page on `localhost:8080`
-6. Start writing files with this command:
+2. Create and activate a python virtual environment using `python3 -m venv .venv` or `uv venv`, then `source .venv/bin/activate`. Install all requirements with `pip3 install -r requirements.txt` or `uv pip install -r requirements.txt`
+3. Pull and run all docker services with `docker compose up -d`
+4. View the web page on `localhost:8080`
+5. Start writing files from the `potoo/` directory with this command:
    `python3 potoo.py -w True -o output_dir/`
-7. Click on individual images to see their generated GIFs. Tiles with green backgrounds are ready to view!
+6. Click on individual images to see their generated GIFs. Tiles with green backgrounds are ready to view!
+
+---
+
+## Running the Web App Binary
+
+Prebuilt `potoo-server` binaries for macOS, Linux and Windows (ARM and x86) are attached to each
+[GitHub Release](https://github.com/biosafetylvl5/courier-potoo/releases). Each archive also includes this README,
+`docker-compose.yml` and the Courier service YAML. Verify downloads against `SHA256SUMS`.
+
+The binary is the web app only; Courier and `potoo.py` still produce the images and GIFs it displays. Point it at
+those directories with flags or environment variables:
+
+| Flag          | Environment variable | Default       |
+|---------------|----------------------|---------------|
+| `-output-dir` | `POTOO_OUTPUT_DIR`   | `/output_dir` |
+| `-gif-dir`    | `POTOO_GIF_DIR`      | `/gif_dir`    |
+| `-addr`       | `POTOO_ADDR`         | `:8080`       |
+
+For example, from a clone of this repo:
+
+```sh
+./potoo-server -output-dir potoo/output_dir -gif-dir potoo/gif_dir
+```
+
+Run `./potoo-server -version` to print the version. The macOS binaries are not signed, so macOS will block them
+until you run `xattr -d com.apple.quarantine potoo-server`.
+
+### Making a Release
+
+Push a tag starting with `v` (e.g. `git tag v0.1.0 && git push origin v0.1.0`). The `Release` workflow tests the
+server, builds all six targets with `scripts/build-release.sh` and publishes the archives. Run the same script locally
+to reproduce a release in `dist/`.

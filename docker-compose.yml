@@ -22,4 +22,3 @@ services:
     volumes:
       - "./potoo/output_dir:/output_dir"
       - "./potoo/gif_dir:/gif_dir"
-      - "./server/pages/:/app/pages"
