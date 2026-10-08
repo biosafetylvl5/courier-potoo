@@ -1,5 +1,7 @@
 services:
   redis:
+    ports:
+      - "6379:6379"
     image: redis
   courier:
     build:
@@ -13,3 +15,27 @@ services:
       - |
         /opt/venv/bin/python -m pip install -r requirements.txt &&
         courier run courier-potoo-service.yaml
+  courier_redis:
+    build:
+      context: .
+      dockerfile: courier.Dockerfile
+    volumes:
+      - ".:/work/"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /opt/venv/bin/python -m pip install -r requirements.txt &&
+        courier run potoo-redis-poller-service.yaml
+  output_watcher:
+    build:
+      context: .
+      dockerfile: courier.Dockerfile
+    volumes:
+      - ".:/work/"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        /opt/venv/bin/python -m pip install -r requirements.txt &&
+        courier run potoo-output-watcher-service.yaml
