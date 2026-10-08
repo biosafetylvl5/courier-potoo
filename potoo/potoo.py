@@ -80,8 +80,11 @@ class Potoo:
             time.sleep(self._timeout)
     def _generate_gif(self, steps_arr : list[Image.Image], tag : str) -> Path:
         output_path = f"{os.path.join(self._output_path, tag)}.gif"
-        steps_arr[0].save(output_path, save_all=True, 
+        # write to a temp file then rename, so readers never see a partial GIF
+        tmp_path = f"{output_path}.tmp"
+        steps_arr[0].save(tmp_path, format="GIF", save_all=True,
                           append_images=steps_arr, duration=self._duration)
+        os.replace(tmp_path, output_path)
         return Path(output_path)
     def ingest_image(self, source : Path) -> None:
         # get random image from imagepath

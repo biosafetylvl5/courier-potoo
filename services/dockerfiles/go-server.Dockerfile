@@ -2,7 +2,7 @@ FROM golang:latest
 
 WORKDIR /app
 
-COPY server/go.mod server/go.sum ./
+COPY server/go.mod ./
 
 RUN go mod download
 

@@ -1,8 +1,4 @@
 services:
-  redis:
-    ports:
-      - "6379:6379"
-    image: redis
   courier:
     build:
       context: .
@@ -17,34 +13,6 @@ services:
       - |
         /opt/venv/bin/python -m pip install -r /requirements.txt &&
         courier run /courier/courier-potoo-service.yaml
-  courier_redis:
-    build:
-      context: .
-      dockerfile: ./services/dockerfiles/courier.Dockerfile
-    volumes:
-      - "./requirements.txt:/requirements.txt"
-      - "./potoo:/potoo/"
-      - "./services/courier/:/courier"
-    command:
-      - /bin/sh
-      - -c
-      - |
-        /opt/venv/bin/python -m pip install -r /requirements.txt &&
-        courier run /courier/potoo-redis-poller-service.yaml
-  output_watcher:
-    build:
-      context: .
-      dockerfile: ./services/dockerfiles/courier.Dockerfile
-    volumes:
-      - "./requirements.txt:/requirements.txt"
-      - "./potoo:/potoo/"
-      - "./services/courier/:/courier"
-    command:
-      - /bin/sh
-      - -c
-      - |
-        /opt/venv/bin/python -m pip install -r /requirements.txt &&
-        courier run /courier/potoo-output-watcher-service.yaml
   go_server:
     build:
       context: .
@@ -52,5 +20,6 @@ services:
     ports:
       - "8080:8080"
     volumes:
+      - "./potoo/output_dir:/output_dir"
       - "./potoo/gif_dir:/gif_dir"
       - "./server/pages/:/app/pages"

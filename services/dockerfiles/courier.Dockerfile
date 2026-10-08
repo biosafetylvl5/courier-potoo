@@ -5,8 +5,7 @@ USER root
 RUN apk add --no-cache \
     git \
     python3 \
-    py3-pip \
-    redis
+    py3-pip
 
 RUN python3 -m venv --system-site-packages /opt/venv
 
