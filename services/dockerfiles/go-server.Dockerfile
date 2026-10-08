@@ -3,7 +3,6 @@ FROM golang:latest
 WORKDIR /app
 
 COPY server/go.mod server/go.sum ./
-COPY server/pages ./pages
 
 RUN go mod download
 
