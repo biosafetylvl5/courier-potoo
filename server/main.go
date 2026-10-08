@@ -12,7 +12,7 @@ import (
 )
 
 var rdb = redis.NewClient(&redis.Options{
-	Addr: "localhost:6379",
+	Addr: "redis:6379",
 })
 
 var galleryTemplate = template.Must(template.New("gallery").Parse(`
@@ -131,7 +131,7 @@ func main() {
 	})
 
 	http.Handle("/gifs/",
-		http.StripPrefix("/gifs/", http.FileServer(http.Dir("../gif_dir"))),
+		http.StripPrefix("/gifs/", http.FileServer(http.Dir("/gif_dir"))),
 	)
 
 	http.HandleFunc("/gif", func(w http.ResponseWriter, r *http.Request) {

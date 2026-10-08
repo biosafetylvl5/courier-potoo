@@ -39,3 +39,11 @@ services:
       - |
         /opt/venv/bin/python -m pip install -r requirements.txt &&
         courier run potoo-output-watcher-service.yaml
+  go_server:
+    build:
+      context: .
+      dockerfile: go-server.Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./gif_dir:/gif_dir"
