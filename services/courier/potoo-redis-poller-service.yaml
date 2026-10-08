@@ -1,9 +1,9 @@
 apiVersion: runcourier.dev/v1alpha1
 kind: Service
 metadata:
-  name: potoo-output-watcher
-  namespace: potoo-output-watcher
-  description: Watcher for outputs and updates the redis database accordingly
+  name: potoo-redis-poller
+  namespace: potoo-redis-poller
+  description: polls redis on each new input
   docstring: null
   labels: {}
   annotations: {}
@@ -17,24 +17,26 @@ spec:
         kind: data_monitor
         name: file_system_poller_watchdog
         config:
-          path: gif_dir
+          path: /potoo/output_dir
           hostname: localhost
-    - identifier: job-builder-dummyjobbuilder
+    - identifier: job-builder-dummyjobbuilder-redis
       spec:
         kind: job_builder
         name: DummyJobBuilder
         config:
           payload:
-            identifier: payload-bash-payload
+            identifier: payload-bash-payload-redis
             spec:
               kind: payload
               name: bash_payload
               config:
                 toolchain: ["redis-cli", "base64"]
                 script: |
+                  IMG=$(cat {{ files[0].file }} | base64)
                   FILE=$(basename {{ files[0].file }})
                   TAG="${FILE%%.*}"
-                  redis-cli -h redis HSET "$TAG" processed true
+                  redis-cli -h redis hsetnx $TAG processed false
+                  cat {{ files[0].file }} | base64 | redis-cli -h redis -x hset $TAG image
     - identifier: dispatcher-local-dispatcher
       spec:
         kind: dispatcher
@@ -42,7 +44,7 @@ spec:
         config: null
   allow_implicit_target: true
   service_config:
-    service_id: watcher-service-e43982a3
+    service_id: watcher-service-57bb51c7
     namespace: default
     prometheus_port: 8000
     broker_url: amqp://admin:admin@localhost:5672/
@@ -55,9 +57,9 @@ spec:
     plugin_health_check_interval: 2
     loki_url: ''
     loki_enabled: false
-    log_level: DEBUG
+    log_level: INFO
     production_mode: false
-    tracing_enabled: true
+    tracing_enabled: false
     tracing_endpoint: http://localhost:4318/v1/traces
     tracing_service_name: ''
     tracing_sample_rate: 1.0

@@ -6,44 +6,50 @@ services:
   courier:
     build:
       context: .
-      dockerfile: courier.Dockerfile
+      dockerfile: ./services/dockerfiles/courier.Dockerfile
     volumes:
-      - ".:/work/"
+      - "./requirements.txt:/requirements.txt"
+      - "./potoo:/potoo/"
+      - "./services/courier/:/courier"
     command:
       - /bin/sh
       - -c
       - |
-        /opt/venv/bin/python -m pip install -r requirements.txt &&
-        courier run courier-potoo-service.yaml
+        /opt/venv/bin/python -m pip install -r /requirements.txt &&
+        courier run /courier/courier-potoo-service.yaml
   courier_redis:
     build:
       context: .
-      dockerfile: courier.Dockerfile
+      dockerfile: ./services/dockerfiles/courier.Dockerfile
     volumes:
-      - ".:/work/"
+      - "./requirements.txt:/requirements.txt"
+      - "./potoo:/potoo/"
+      - "./services/courier/:/courier"
     command:
       - /bin/sh
       - -c
       - |
-        /opt/venv/bin/python -m pip install -r requirements.txt &&
-        courier run potoo-redis-poller-service.yaml
+        /opt/venv/bin/python -m pip install -r /requirements.txt &&
+        courier run /courier/potoo-redis-poller-service.yaml
   output_watcher:
     build:
       context: .
-      dockerfile: courier.Dockerfile
+      dockerfile: ./services/dockerfiles/courier.Dockerfile
     volumes:
-      - ".:/work/"
+      - "./requirements.txt:/requirements.txt"
+      - "./potoo:/potoo/"
+      - "./services/courier/:/courier"
     command:
       - /bin/sh
       - -c
       - |
-        /opt/venv/bin/python -m pip install -r requirements.txt &&
-        courier run potoo-output-watcher-service.yaml
+        /opt/venv/bin/python -m pip install -r /requirements.txt &&
+        courier run /courier/potoo-output-watcher-service.yaml
   go_server:
     build:
       context: .
-      dockerfile: go-server.Dockerfile
+      dockerfile: ./services/dockerfiles/go-server.Dockerfile
     ports:
       - "8080:8080"
     volumes:
-      - "./gif_dir:/gif_dir"
+      - "./potoo/gif_dir:/gif_dir"

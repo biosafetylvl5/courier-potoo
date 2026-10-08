@@ -17,7 +17,7 @@ spec:
         kind: data_monitor
         name: file_system_poller_watchdog
         config:
-          path: output_dir
+          path: /potoo/output_dir
           hostname: localhost
     - identifier: job-builder-dummyjobbuilder
       spec:
@@ -30,14 +30,14 @@ spec:
               kind: payload
               name: python_payload
               config:
-                file: potoo.py
+                file: /potoo/potoo.py
                 suffix_args:
                   - -i
                   - "{{ files[0].file }}"
                   - -I
-                  - img_dir
+                  - /potoo/img_dir
                   - -o
-                  - gif_dir
+                  - /potoo/gif_dir
     - identifier: dispatcher-local-dispatcher
       spec:
         kind: dispatcher
@@ -64,7 +64,7 @@ spec:
     plugin_health_check_interval: 2
     loki_url: ''
     loki_enabled: false
-    log_level: DEBUG
+    log_level: INFO
     production_mode: false
     tracing_enabled: false
     tracing_endpoint: http://localhost:4318/v1/traces
